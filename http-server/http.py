@@ -37,38 +37,54 @@ class Server():
         # Checking for invalid requests
         modified_date = None
         has_host = False
+        content_type = ""
         for i in range(len(request_msg)):
             if (request_msg[i].lower().startswith("if-modified-since: ")):
                 modified_date = request_msg[i].split(":", 1)[1].strip()
             if (request_msg[i].lower().startswith("host: ")):
                 has_host = True
+            if (request_msg[i].lower().startswith("content-type: ")):
+                content_type = request_msg[i].split(" ")[1]
         if (has_host is False):
             status = 400
+
+        print("Content type:", content_type)
 
         # Error checking request line
         request_line = request_msg[0].split(" ")
         if (len(request_line) != 3):
             status = 400
-        if (request_line[0] != "GET"):
+        if (request_line[0] not in ["HEAD", "GET", "POST"]):
             status = 501
         if (request_line[2] != "HTTP/1.1"):
             status = 505
 
-        # Error checking file
         file_ext = os.path.splitext(request_line[1])[1]
         filename = request_line[1][1:]
-        (media_type, mode) = self._media_type(file_ext)
         content = ""
-        if media_type:
-            try:
-                inputfile = open(filename, mode)
-                content = inputfile.read()
-            except OSError:
-                status = 404
+
+        if request_line[0] == "GET":
+            (media_type, mode) = self._media_type(file_ext)
+            if media_type:
+                try:
+                    inputfile = open(filename, mode)
+                    content = inputfile.read()
+                except OSError:
+                    status = 404
+                    filename = None
+            else:
+                status = 415
                 filename = None
-        else:
-            status = 415
-            filename = None
+        if request_line[0] == "POST":
+            if content_type not in ["application/x-www-form-urlencoded",
+                    "multipart/form-data", "application/json"]:
+                status = 415
+                filename = None
+            else:
+                filename = request_line[1][1:]
+                media_type = content_type
+                content = ""
+
 
         request_info = [status, filename, media_type, modified_date]
         self._send_response(request_info, content)
