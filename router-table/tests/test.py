@@ -2,14 +2,6 @@ from socket import *
 import sys
 
 
-# Test script for Project 2
-# This code is pretty brain dead. It doesn't catch exceptions if things crash,
-# but does check responses to see if they are correct
-
-
-# First a bunch of helpers. Skip to the end to see the actual tests sent
-
-
 # A function that checks the ACK that comes back to make sure it is
 # properly formed
 # Returns True if properly formed, False if not
@@ -215,31 +207,48 @@ testsPassed = 0
 # Run the tests
 
 
-# update with some nested tests for B, C, D, all same cost
-body = 'B 155.33.0.0/16 30\r\n'
-body += 'C 155.33.1.0/24 30\r\n'
-body += 'D 155.0.0.0/8 30\r\n'
+# query first, no routes. Should give A at weight 100
+queryHelper('192.168.2.100','A', 100)
+
+
+# now update with a few /24 routes for B 
+body = 'B 200.55.1.0/24 50\r\n'
+body += 'B 200.55.2.0/24 50\r\n'
+body += 'B 200.55.3.0/24 50\r\n'
 updateHelper(body)
 
-queryHelper('155.33.5.45','B', 30)
-queryHelper('155.33.2.45','B', 30)
-queryHelper('155.33.1.45','C', 30)
-queryHelper('155.11.5.45','D', 30)
 
-# update with some more nested routes
-body = 'E 155.34.0.0/16 30\r\n'
-body += 'F 155.33.2.0/24 30\r\n'
+# now update with a few /24 routes for C and D in same message 
+body = 'C 200.55.4.0/24 40\r\n'
+body += 'D 200.55.5.0/24 40\r\n'
+body += 'D 200.55.6.0/24 40\r\n'
 updateHelper(body)
 
-queryHelper('155.33.5.5','B', 30)
-queryHelper('155.33.1.5','C', 30)
-queryHelper('155.34.11.5','E', 30)
-queryHelper('155.33.2.5','F', 30)
+    
+# query again, even with new routes should give A at weight 100
+queryHelper('192.168.2.100','A', 100)
 
+# query new route. Should give B at weight 50
+queryHelper('200.55.1.40','B', 50)
+
+# query new route. Should give D at weight 40
+queryHelper('200.55.6.40','D', 40)
+
+# query new route not claimed in any UPDATE. Should give A at weight 100
+queryHelper('200.55.8.40','A', 100)
+
+
+# now update with a /16 routes for E that is more expensive (so won't override
+# the cheaper /24s, but does cover other 200.55.*.*) 
+updateHelper('E 200.55.0.0/16 75\r\n')
+
+
+# query route again. Should still give D at weight 40
+queryHelper('200.55.6.40','D', 40)
+
+# query route again. Should now give E at weight 75, not A
+queryHelper('200.55.8.40','E', 75)
 
 perc = testsPassed/testID * 100
 
 print('SUMMARY: ' + str(testsPassed) + ' of ' + str(testID) + ' (' + str(perc) + '%) tests passed.\n\n')
-
-# That's it...
-            
